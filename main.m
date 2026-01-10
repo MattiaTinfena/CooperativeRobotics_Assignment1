@@ -41,16 +41,22 @@ wTog=[rotation(0,0,0) [0.65, -0.35, 0.28]'; 0 0 0 1];
 arm1.set_obj_goal(wTog)
 arm2.set_obj_goal(wTog)
 
-
 %Define Tasks, input values(Robot type(L,R,BM), Task Name)
 left_tool_task=tool_task("L","LT");
 right_tool_task=tool_task("R","RT");
 
+task_list = {left_tool_task, right_tool_task};
+task_list_name = ["LTT", "RTT"];
+
+
 %Actions for each phase: go to phase, coop_motion phase, end_motion phase
-go_to={left_tool_task};
+go_to = ["LTT", "RTT"];
+
 %Load Action Manager Class and load actions
 actionManager = ActionManager();
-actionManager.addAction(go_to);
+actionManager.setTaskList(task_list, task_list_name);
+actionManager.addAction(go_to, "GT");
+actionManager.setCurrentAction("GT", bm_sim.time);
 
 %Initiliaze robot interface
 robot_udp=UDP_interface(real_robot);
@@ -70,7 +76,7 @@ for t = 0:dt:end_time
     bm_sim.update_full_kinematics();
     
     % 3. Compute control commands for current action
-    [q_dot]=actionManager.computeICAT(bm_sim);
+    [q_dot]=actionManager.computeICAT(bm_sim,bm_sim.time);
 
     % 4. Step the simulator (integrate velocities)
     bm_sim.sim(q_dot);
@@ -84,9 +90,9 @@ for t = 0:dt:end_time
     % 7. Optional real-time slowdown
     SlowdownToRealtime(dt);
 end
-%Display joint position and velocity, Display for a given action, a number
-%of tasks
-% action=1;
-% tasks=[1];
-% logger.plotAll(action,tasks);
+% Display joint position and velocity, Display for a given action, a number
+% of tasks
+action=1;
+tasks=[1];
+logger.plotAll(action,tasks);
 end
