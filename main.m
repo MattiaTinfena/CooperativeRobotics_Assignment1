@@ -32,12 +32,10 @@ w_obj_pos = [0.5 0 0.59]';
 w_obj_ori = rotation(0,0,0);
 
 %Set goal frames for left and right arm, based on object frame
-%TODO: Set arm goal frame based on object frame.
 arm1.setGoal(w_obj_pos, w_obj_ori, w_obj_pos - [obj_length/2; 0; 0],arm1.wTt(1:3, 1:3) * rotation(0, deg2rad(30), 0));
 arm2.setGoal(w_obj_pos, w_obj_ori, w_obj_pos + [obj_length/2; 0; 0],arm2.wTt(1:3, 1:3) * rotation(0, deg2rad(30), 0));
 
 %Define Object goal frame (Cooperative Motion)
-% wTog=[arm1.wTt(1:3, 1:3) * rotation(0.0, deg2rad(30), 0.0) [0.65, -0.35, 0.28]'; 0 0 0 1]; % aggiungo la rotazione di 30 gradi perché poi l'errore lo calcolo in generale
 wTog=[rotation(0.0, 0.0, 0.0) [0.65, -0.35, 0.28]'; 0 0 0 1];
 arm1.set_obj_goal(wTog);
 arm2.set_obj_goal(wTog);
@@ -57,11 +55,11 @@ stp_joints_task = stop_joints_task("R","SJ",false);
 task_list = {left_tool_task, right_tool_task, left_minimun_altitude_task, right_minimun_altitude_task, left_joint_limit_task, right_joint_limit_task, bim_rigid_constraint_task, left_move_object_task, right_move_object_task, stp_joints_task};
 task_list_name = ["LTT", "RTT", "LMAT", "RMAT", "LJLT", "RJLT", "BRCT", "LMOT", "RMOT", "SJT"];
 
-
 %Actions for each phase: go to phase, coop_motion phase, end_motion phase
 move_to = ["LJLT", "RJLT", "LMAT", "RMAT", "LTT", "RTT"];
 move_obj = ["LJLT", "RJLT", "LMAT", "RMAT", "BRCT" "LMOT", "RMOT"];
 stop = ["LMAT", "RMAT", "SJT"];
+
 %Load Action Manager Class and load actions
 actionManager = ActionManager();
 actionManager.setTaskList(task_list, task_list_name);
@@ -74,7 +72,7 @@ actionManager.setCurrentAction("MT", bm_sim.time);
 robot_udp=UDP_interface(real_robot);
 
 %Initialize logger
-% logger=SimulationLogger(ceil(end_time/dt)+1,bm_sim,actionManager);
+logger=SimulationLogger(ceil(end_time/dt)+1,bm_sim,actionManager);
 
 %Main simulation Loop
 for t = 0:dt:end_time
@@ -87,40 +85,33 @@ for t = 0:dt:end_time
     % 2. Update Full kinematics of the bimanual system
     bm_sim.update_full_kinematics();
 
-    % 3. Compute control commands for current action
-    [q_dot]=actionManager.computeICAT(bm_sim,bm_sim.time);
+    % 3. Action switching
+    goal_reached = norm(bm_sim.left_arm.rot_to_goal) < 0.01 && norm(bm_sim.left_arm.dist_to_goal) < 0.01;
 
-    % 4. Step the simulator (integrate velocities)
-    bm_sim.sim(q_dot);
-
-    % 5. Send updated state to Pybullet
-    robot_udp.send(t,bm_sim)
-
-    [v_ang, v_lin] = CartError(bm_sim.left_arm.wTg , bm_sim.left_arm.wTt);
-
-    if norm(v_lin) < 0.1 && actionManager.current_action == 1 && norm(v_ang) < 0.1
+    if actionManager.current_action == 1 && goal_reached
         actionManager.setCurrentAction("MO",  bm_sim.time);
-    end
 
-    r_toc = bm_sim.left_arm.wTo(1:3, 4) - bm_sim.left_arm.wTg(1:3,4); % <w>
-    tToc = [eye(3), bm_sim.left_arm.wTt(1:3, 1:3)' * r_toc; 0 0 0 1];
-    wToc = bm_sim.left_arm.wTt * tToc;
-    wTog = [bm_sim.left_arm.wTt(1:3, 1:3) * bm_sim.left_arm.wTog(1:3, 1:3), bm_sim.left_arm.wTog(1:3, 4); 0 0 0 1];
-
-    [v_ang2, v_lin2] = CartError(wTog ,wToc);
-
-    if norm(v_lin2) < 0.1 && actionManager.current_action == 2 && norm(v_ang2) < 0.1
+    elseif actionManager.current_action == 2 && goal_reached
         actionManager.setCurrentAction("ST",  bm_sim.time);
     end
-    % 6. Lggging
-    % logger.update(bm_sim.time,bm_sim.loopCounter)
-    bm_sim.time;
-    % 7. Optional real-time slowdown
-    SlowdownToRealtime(dt);
 
-    % Display joint position and velocity, Display for a given action, a number
-    % of tasks
-    action=1;
-    tasks=[1];
-    % logger.plotAll(action,tasks);
+    % 4. Compute control commands for current action
+    [q_dot]=actionManager.computeICAT(bm_sim,bm_sim.time);
+
+    % 5. Step the simulator (integrate velocities)
+    bm_sim.sim(q_dot);
+
+    % 6. Send updated state to Pybullet
+    robot_udp.send(t,bm_sim)
+
+    % 7. Lggging
+    logger.update(bm_sim.time,bm_sim.loopCounter)
+
+    bm_sim.time;
+    % 8. Optional real-time slowdown
+    SlowdownToRealtime(dt);
 end
+% Display joint position and velocity, Display for a given action, a number of tasks
+action=1;
+tasks=[1];
+logger.plotAll(action,tasks);
