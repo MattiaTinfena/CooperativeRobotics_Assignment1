@@ -36,7 +36,7 @@ arm1.setGoal(w_obj_pos, w_obj_ori, w_obj_pos - [obj_length/2; 0; 0],arm1.wTt(1:3
 arm2.setGoal(w_obj_pos, w_obj_ori, w_obj_pos + [obj_length/2; 0; 0],arm2.wTt(1:3, 1:3) * rotation(0, deg2rad(30), 0));
 
 %Define Object goal frame (Cooperative Motion)
-wTog=[rotation(0.0, 0.0, 0.0) [0.65, -0.35, 0.28]'; 0 0 0 1];
+wTog=[rotation(0.0, 0.0, 0.0) [0, 0, 0]'; 0 0 0 1];
 arm1.set_obj_goal(wTog);
 arm2.set_obj_goal(wTog);
 
@@ -57,7 +57,7 @@ task_list_name = ["LTT", "RTT", "LMAT", "RMAT", "LJLT", "RJLT", "BRCT", "LMOT", 
 
 %Actions for each phase: go to phase, coop_motion phase, end_motion phase
 move_to = ["LJLT", "RJLT", "LMAT", "RMAT", "LTT", "RTT"];
-move_obj = ["LJLT", "RJLT", "LMAT", "RMAT", "BRCT" "LMOT", "RMOT"];
+move_obj = ["BRCT", "LJLT", "RJLT", "LMAT", "RMAT", "LMOT", "RMOT"];
 stop = ["LMAT", "RMAT", "SJT"];
 
 %Load Action Manager Class and load actions
@@ -84,13 +84,8 @@ for t = 0:dt:end_time
         bm_sim.left_arm.q=ql;
         bm_sim.right_arm.q=qr;
     end
-    % 2. Update Full kinematics of the bimanual system
-    bm_sim.update_full_kinematics();
 
-    % 3. Compute control commands for current action
-    [q_dot]=actionManager.computeICAT(bm_sim,bm_sim.time);
-
-    % 4. Action switching
+    % 2. Action switching
     goal_reached = norm(bm_sim.left_arm.rot_to_goal) < 0.01 && norm(bm_sim.left_arm.dist_to_goal) < 0.01;
     delta_time = bm_sim.time - initial_time;
 
@@ -100,6 +95,12 @@ for t = 0:dt:end_time
     elseif (actionManager.current_action == 2 && goal_reached) || (delta_time > 10)
         actionManager.setCurrentAction("ST",  bm_sim.time);
     end
+
+    % 3. Update Full kinematics of the bimanual system
+    bm_sim.update_full_kinematics();
+
+    % 4. Compute control commands for current action
+    [q_dot]=actionManager.computeICAT(bm_sim,bm_sim.time);
 
     % 5. Step the simulator (integrate velocities)
     bm_sim.sim(q_dot);
