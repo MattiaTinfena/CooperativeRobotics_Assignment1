@@ -38,10 +38,10 @@ classdef ActionManager < handle
 
         function [ydotbar] = computeICAT(obj, robot, time)
 
-            ap = {};
+
             if (obj.action_changes == 0)
                 for i = 1:length(obj.tasks)
-                    ap{end + 1} = 1;
+                    obj.tasks{i}.ap = 1;
                 end
             else
 
@@ -49,14 +49,14 @@ classdef ActionManager < handle
                     for i = 1:length(obj.tasks)
                         if(obj.ap_instructions(i) == 1)
                             if(obj.tasks{i}.smooth)
-                                ap{end + 1} = IncreasingBellShapedFunction(obj.initial_time, obj.initial_time +2, 0, 1, time);
+                                obj.tasks{i}.ap = IncreasingBellShapedFunction(obj.initial_time, obj.initial_time +2, 0, 1, time);
                             else
-                                ap{end + 1} = 1;
+                                obj.tasks{i}.ap = 1;
                             end
                         elseif(obj.ap_instructions(i) == -1)
-                            ap{end + 1} = DecreasingBellShapedFunction(obj.initial_time, obj.initial_time +2, 0, 1, time);
+                            obj.tasks{i}.ap = DecreasingBellShapedFunction(obj.initial_time, obj.initial_time +2, 0, 1, time);
                         else
-                            ap{end + 1} = 1;
+                            obj.tasks{i}.ap = 1;
                         end
                     end
                 else
@@ -66,11 +66,10 @@ classdef ActionManager < handle
                 % when gaussian transitory is ended
                 if (time > obj.initial_time + 2)
                     obj.tasks = obj.actions{obj.current_action};
-                    disp(obj.tasks);
+                    % disp(obj.tasks);
                     obj.action_changes = 0;
-                    ap = {};
                     for i = 1:length(obj.tasks)
-                        ap{end + 1} = 1;
+                        obj.tasks{i}.ap = 1;
                     end
                 end
             end
@@ -86,7 +85,7 @@ classdef ActionManager < handle
             ydotbar = zeros(14,1);
             Qp = eye(14);
             for i = 1:length(obj.tasks)
-                [Qp, ydotbar] = iCAT_task(obj.tasks{i}.A * ap{i}, obj.tasks{i}.J, ...
+                [Qp, ydotbar] = iCAT_task(obj.tasks{i}.A * obj.tasks{i}.ap, obj.tasks{i}.J, ...
                     Qp, ydotbar, obj.tasks{i}.xdotbar, ...
                     1e-4, 0.01, 10);
             end

@@ -85,7 +85,26 @@ for t = 0:dt:end_time
         bm_sim.right_arm.q=qr;
     end
 
-    % 2. Action switching
+    % 2. Update Full kinematics of the bimanual system
+    bm_sim.update_full_kinematics();
+
+    % 3. Compute control commands for current action
+    [q_dot]=actionManager.computeICAT(bm_sim,bm_sim.time);
+
+    % 4. Step the simulator (integrate velocities)
+    bm_sim.sim(q_dot);
+
+    % 5. Send updated state to Pybullet
+    robot_udp.send(t,bm_sim)
+
+    % 6. Lggging
+    logger.update(bm_sim.time,bm_sim.loopCounter)
+
+    bm_sim.time;
+    % 7. Optional real-time slowdown
+    SlowdownToRealtime(dt);
+
+    % 8. Action switching
     goal_reached = norm(bm_sim.left_arm.rot_to_goal) < 0.01 && norm(bm_sim.left_arm.dist_to_goal) < 0.01;
     delta_time = bm_sim.time - initial_time;
 
@@ -95,25 +114,6 @@ for t = 0:dt:end_time
     elseif (actionManager.current_action == 2 && goal_reached) || (delta_time > 10)
         actionManager.setCurrentAction("ST",  bm_sim.time);
     end
-
-    % 3. Update Full kinematics of the bimanual system
-    bm_sim.update_full_kinematics();
-
-    % 4. Compute control commands for current action
-    [q_dot]=actionManager.computeICAT(bm_sim,bm_sim.time);
-
-    % 5. Step the simulator (integrate velocities)
-    bm_sim.sim(q_dot);
-
-    % 6. Send updated state to Pybullet
-    robot_udp.send(t,bm_sim)
-
-    % 7. Lggging
-    logger.update(bm_sim.time,bm_sim.loopCounter)
-
-    bm_sim.time;
-    % 8. Optional real-time slowdown
-    SlowdownToRealtime(dt);
 end
 % Display joint position and velocity, Display for a given action, a number of tasks
 action=1;
