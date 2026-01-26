@@ -1,5 +1,4 @@
 classdef joint_limit_task < Task
-    %Tool position control for a single arm
     properties
         delta = deg2rad(10);
     end

@@ -1,5 +1,4 @@
 classdef minimum_altitude_task < Task
-    %Tool position control for a single arm
     properties
 
     end
