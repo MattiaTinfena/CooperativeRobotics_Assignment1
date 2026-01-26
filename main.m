@@ -68,6 +68,8 @@ actionManager.addAction(move_obj, "MO");
 actionManager.addAction(stop, "ST");
 actionManager.setCurrentAction("MT", bm_sim.time);
 
+initial_time = bm_sim.time;
+
 %Initiliaze robot interface
 robot_udp=UDP_interface(real_robot);
 
@@ -85,18 +87,19 @@ for t = 0:dt:end_time
     % 2. Update Full kinematics of the bimanual system
     bm_sim.update_full_kinematics();
 
-    % 3. Action switching
+    % 3. Compute control commands for current action
+    [q_dot]=actionManager.computeICAT(bm_sim,bm_sim.time);
+
+    % 4. Action switching
     goal_reached = norm(bm_sim.left_arm.rot_to_goal) < 0.01 && norm(bm_sim.left_arm.dist_to_goal) < 0.01;
+    delta_time = bm_sim.time - initial_time;
 
     if actionManager.current_action == 1 && goal_reached
         actionManager.setCurrentAction("MO",  bm_sim.time);
 
-    elseif actionManager.current_action == 2 && goal_reached
+    elseif (actionManager.current_action == 2 && goal_reached) || (delta_time > 10)
         actionManager.setCurrentAction("ST",  bm_sim.time);
     end
-
-    % 4. Compute control commands for current action
-    [q_dot]=actionManager.computeICAT(bm_sim,bm_sim.time);
 
     % 5. Step the simulator (integrate velocities)
     bm_sim.sim(q_dot);
