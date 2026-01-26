@@ -7,7 +7,7 @@ addpath('./tasks')
 clc;clear;close all;
 %Simulation Parameters
 dt = 0.005;
-end_time = 10;
+end_time = 15;
 
 % Initialize Franka Emika Panda Model
 model = load("panda.mat");
@@ -41,16 +41,16 @@ arm1.set_obj_goal(wTog);
 arm2.set_obj_goal(wTog);
 
 %Define Tasks, input values(Robot type(L,R,BM), Task Name)
-left_tool_task=tool_task("L","LT",false);
-right_tool_task=tool_task("R","RT",false);
-left_minimun_altitude_task=minimum_altitude_task("L","LMA",false);
-right_minimun_altitude_task=minimum_altitude_task("R","RMA",false);
-left_joint_limit_task=joint_limit_task("L","LJL",false);
-right_joint_limit_task=joint_limit_task("R","RJL",false);
-bim_rigid_constraint_task = bimanual_rigid_constraint_task("R","BRC",true);
-left_move_object_task = move_object_task("L", "LMO", false);
-right_move_object_task = move_object_task("R", "RMO", false);
-stp_joints_task = stop_joints_task("R","SJ",false);
+left_tool_task=tool_task("L","LT",true);
+right_tool_task=tool_task("R","RT",true);
+left_minimun_altitude_task=minimum_altitude_task("L","LMA",true);
+right_minimun_altitude_task=minimum_altitude_task("R","RMA",true);
+left_joint_limit_task=joint_limit_task("L","LJL",true);
+right_joint_limit_task=joint_limit_task("R","RJL",true);
+bim_rigid_constraint_task = bimanual_rigid_constraint_task("R","BRC",false);
+left_move_object_task = move_object_task("L", "LMO", true);
+right_move_object_task = move_object_task("R", "RMO", true);
+stp_joints_task = stop_joints_task("R","SJ",true);
 
 task_list = {left_tool_task, right_tool_task, left_minimun_altitude_task, right_minimun_altitude_task, left_joint_limit_task, right_joint_limit_task, bim_rigid_constraint_task, left_move_object_task, right_move_object_task, stp_joints_task};
 task_list_name = ["LTT", "RTT", "LMAT", "RMAT", "LJLT", "RJLT", "BRCT", "LMOT", "RMOT", "SJT"];
@@ -110,6 +110,7 @@ for t = 0:dt:end_time
 
     if actionManager.current_action == 1 && goal_reached
         actionManager.setCurrentAction("MO",  bm_sim.time);
+        initial_time = bm_sim.time;
 
     elseif (actionManager.current_action == 2 && goal_reached) || (delta_time > 10)
         actionManager.setCurrentAction("ST",  bm_sim.time);
