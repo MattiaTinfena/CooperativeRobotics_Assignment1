@@ -7,7 +7,7 @@ addpath('./tasks')
 clc;clear;close all;
 %Simulation Parameters
 dt = 0.005;
-end_time = 30;
+end_time = 10;
 
 % Initialize Franka Emika Panda Model
 model = load("panda.mat");
@@ -36,7 +36,7 @@ arm1.setGoal(w_obj_pos, w_obj_ori, w_obj_pos - [obj_length/2; 0; 0],arm1.wTt(1:3
 arm2.setGoal(w_obj_pos, w_obj_ori, w_obj_pos + [obj_length/2; 0; 0],arm2.wTt(1:3, 1:3) * rotation(0, deg2rad(30), 0));
 
 %Define Object goal frame (Cooperative Motion)
-wTog=[rotation(0.0, 0.0, 0.0) [0, 0, 0]'; 0 0 0 1];
+wTog=[rotation(0.0, 0.0, 0.0) [0.65, -0.35, 0.28]'; 0 0 0 1];
 arm1.set_obj_goal(wTog);
 arm2.set_obj_goal(wTog);
 
@@ -117,5 +117,5 @@ for t = 0:dt:end_time
 end
 % Display joint position and velocity, Display for a given action, a number of tasks
 action=1;
-tasks=[1];
+tasks=[1, 2, 3, 4, 5, 6];
 logger.plotAll(action,tasks);

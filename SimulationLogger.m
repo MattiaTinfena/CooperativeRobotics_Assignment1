@@ -52,34 +52,47 @@ classdef SimulationLogger < handle
                 % Example plotting for robot state
                 figure(1);
                 subplot(2,1,1);
-                title('Left arm motion');
+                title("joint positions")
                 plot(obj.t, obj.ql, 'LineWidth', 2);
                 legend('q_1','q_2','q_3','q_4','q_5','q_6','q_7');
                 subplot(2,1,2);
+                title("joint velocities")
                 plot(obj.t, obj.qdotl, 'LineWidth', 2);
                 legend('qd_1','qd_2','qd_3','qd_4','qd_5','qd_6','qd_7');
+                sgtitle('Left arm motion');
+
                 figure(2);
-                title('Right arm motion');    
                 subplot(2,1,1);
+                title("joint positions")
                 plot(obj.t, obj.qr, 'LineWidth', 2);
                 legend('q_1','q_2','q_3','q_4','q_5','q_6','q_7');
                 subplot(2,1,2);
+                title("joint velocities")
+
                 plot(obj.t, obj.qdotr, 'LineWidth', 2);
                 legend('qd_1','qd_2','qd_3','qd_4','qd_5','qd_6','qd_7');
+                sgtitle('Right arm motion');    
+
 
                 % Optional: plot a number of tasks from an specific action set
-                figure(3);
                 s=squeeze(obj.xdotbar_task(action,:,:));
                 nt=length(task);
                 title(strcat('Action Set'," ",num2str(action)));  
                 for i=1:nt
-                    subplot(1,nt,i)
+                    figure(2+i);
                     data=cell2mat(s(task(i),:));
-                    plot(obj.t(1,1:end-1),data','.-')
-                    grid on
-                    if(obj.action_set.actions{action}{task(i)}.task_name=="T")
-                        legend('wx','wy','wz','vx','vy','vz');
+                    plot(obj.t(1,1:end-1),data')
+                    labels = {};
+                    
+                    for j=1:size(data,1)
+                        labels{j} = strcat('x', int2str(j));
                     end
+                    legend(labels);
+                    labels
+
+                    % if(obj.action_set.actions{action}{task(i)}.task_name=="T")
+                    %     legend('wx','wy','wz','vx','vy','vz');
+                    % end
                     title([strcat('Robot'," ",obj.action_set.actions{action}{task(i)}.ID," ",'Task'," ",num2str(task(i))," ",obj.action_set.actions{action}{task(i)}.task_name)]);
                 end
             end
