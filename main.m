@@ -117,6 +117,4 @@ for t = 0:dt:end_time
     end
 end
 % Display joint position and velocity, Display for a given action, a number of tasks
-action=1;
-tasks=[1, 2, 3, 4, 5, 6];
-logger.plotAll(action,tasks);
+logger.plotAll();
