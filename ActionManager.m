@@ -113,53 +113,24 @@ classdef ActionManager < handle
                 error('Action not found');
             end
 
-
-            % ... (trova l'indice dell'azione come già fai) ...
-
             act_tags  = obj.actions_tag{obj.current_action};
             prev_tags = obj.actions_tag{obj.previous_action};
 
-            % 1. Identifica tutti i tag coinvolti nella transizione
             union_tags = union(act_tags, prev_tags);
 
-            % 2. FILTRO CRUCIALE: Crea all_tags seguendo l'ordine di 'all_task_names'
-            % ismember(A, B) con 'stable' non basta qui, vogliamo l'ordine di obj.all_task_names
             mask_involved = ismember(obj.all_task_names, union_tags);
-            all_tags = obj.all_task_names(mask_involved); % Questi sono i tag ordinati per priorità
+            all_tags = obj.all_task_names(mask_involved);
 
-            % 3. Ora recupera gli oggetti task corrispondenti
             [tf_all, idx_all] = ismember(all_tags, obj.all_task_names);
             obj.tasks = obj.all_task_list(idx_all(tf_all));
 
-            % 4. Calcola le istruzioni di attivazione basandoti sul nuovo all_tags
             in_act  = ismember(all_tags, act_tags);
             in_prev = ismember(all_tags, prev_tags);
 
             obj.ap_instructions = zeros(1, numel(all_tags));
-            obj.ap_instructions( in_act &  in_prev) =  0;  % Resta attivo
-            obj.ap_instructions( in_act & ~in_prev) = +1;  % Deve attivarsi
-            obj.ap_instructions(~in_act &  in_prev) = -1;  % Deve spegnersi
-
-            % 1. Identifica tutti i tag coinvolti nella transizione
-            union_tags = union(act_tags, prev_tags);
-
-            % 2. FILTRO CRUCIALE: Crea all_tags seguendo l'ordine di 'all_task_names'
-            % ismember(A, B) con 'stable' non basta qui, vogliamo l'ordine di obj.all_task_names
-            mask_involved = ismember(obj.all_task_names, union_tags);
-            all_tags = obj.all_task_names(mask_involved); % Questi sono i tag ordinati per priorità
-
-            % 3. Ora recupera gli oggetti task corrispondenti
-            [tf_all, idx_all] = ismember(all_tags, obj.all_task_names);
-            obj.tasks = obj.all_task_list(idx_all(tf_all));
-
-            % 4. Calcola le istruzioni di attivazione basandoti sul nuovo all_tags
-            in_act  = ismember(all_tags, act_tags);
-            in_prev = ismember(all_tags, prev_tags);
-
-            obj.ap_instructions = zeros(1, numel(all_tags));
-            obj.ap_instructions( in_act &  in_prev) =  0;  % Resta attivo
-            obj.ap_instructions( in_act & ~in_prev) = +1;  % Deve attivarsi
-            obj.ap_instructions(~in_act &  in_prev) = -1;  % Deve spegnersi end
+            obj.ap_instructions( in_act &  in_prev) =  0;
+            obj.ap_instructions( in_act & ~in_prev) = +1;
+            obj.ap_instructions(~in_act &  in_prev) = -1;
         end
     end
 end
