@@ -7,7 +7,7 @@ addpath('./tasks')
 clc;clear;close all;
 %Simulation Parameters
 dt = 0.005;
-end_time = 15;
+end_time = 20;
 
 % Initialize Franka Emika Panda Model
 model = load("panda.mat");
@@ -36,11 +36,13 @@ arm1.setGoal(w_obj_pos, w_obj_ori, w_obj_pos - [obj_length/2; 0; 0],arm1.wTt(1:3
 arm2.setGoal(w_obj_pos, w_obj_ori, w_obj_pos + [obj_length/2; 0; 0],arm2.wTt(1:3, 1:3) * rotation(0, deg2rad(30), 0));
 
 %Define Object goal frame (Cooperative Motion)
-wTog=[rotation(0.0, 0.0, 0.0) [0.65, -0.35, 0.28]'; 0 0 0 1];
+% wTog=[rotation(0.0, 0.0, 0.0) [0.65, -0.35, 0.28]'; 0 0 0 1];
+wTog=[rotation(0.0, deg2rad(5), 0) [0.4, 0, 0]'; 0 0 0 1]; % To stress the system
+
 arm1.set_obj_goal(wTog);
 arm2.set_obj_goal(wTog);
 
-%Define Tasks, input values(Robot type(L,R,BM), Task Name)
+%Define Tasks, input values(Robot type(L,R,BM), Task Name, smoothness)
 left_tool_task=tool_task("L","LT",true);
 right_tool_task=tool_task("R","RT",true);
 left_minimun_altitude_task=minimum_altitude_task("L","LMA",true);
@@ -50,10 +52,12 @@ right_joint_limit_task=joint_limit_task("R","RJL",true);
 bim_rigid_constraint_task = bimanual_rigid_constraint_task("R","BRC",false);
 left_move_object_task = move_object_task("L", "LMO", true);
 right_move_object_task = move_object_task("R", "RMO", true);
-stp_joints_task = stop_joints_task("R","SJ",true);
+stp_joints_task = stop_joints_task("R","SJ", true);
 
-task_list = {left_tool_task, right_tool_task, left_minimun_altitude_task, right_minimun_altitude_task, left_joint_limit_task, right_joint_limit_task, bim_rigid_constraint_task, left_move_object_task, right_move_object_task, stp_joints_task};
-task_list_name = ["LTT", "RTT", "LMAT", "RMAT", "LJLT", "RJLT", "BRCT", "LMOT", "RMOT", "SJT"];
+task_list = {bim_rigid_constraint_task, left_joint_limit_task, right_joint_limit_task, left_minimun_altitude_task, ...
+    right_minimun_altitude_task, stp_joints_task, left_move_object_task, right_move_object_task, left_tool_task, right_tool_task};
+task_list_name = ["BRCT", "LJLT", "RJLT", "LMAT", "RMAT", "SJT", "LMOT", "RMOT", "LTT", "RTT"];
+
 
 %Actions for each phase: go to phase, coop_motion phase, end_motion phase
 move_to = ["LJLT", "RJLT", "LMAT", "RMAT", "LTT", "RTT"];
@@ -105,15 +109,20 @@ for t = 0:dt:end_time
     SlowdownToRealtime(dt);
 
     % 8. Action switching
-    goal_reached = norm(bm_sim.left_arm.rot_to_goal) < 0.01 && norm(bm_sim.left_arm.dist_to_goal) < 0.01;
+    goal_reached = norm(bm_sim.left_arm.rot_to_goal) < 0.001 && norm(bm_sim.left_arm.dist_to_goal) < 0.001 && ...
+        norm(bm_sim.right_arm.rot_to_goal) < 0.001 && norm(bm_sim.left_arm.dist_to_goal) < 0.001;
     delta_time = bm_sim.time - initial_time;
+    goal_reached2 = norm(bm_sim.left_arm.rot_to_goal2) < 0.001 && norm(bm_sim.left_arm.dist_to_goal2) < 0.001 && ...
+        norm(bm_sim.right_arm.rot_to_goal2) < 0.001 && norm(bm_sim.right_arm.dist_to_goal2) < 0.001;
+
 
     if actionManager.current_action == 1 && goal_reached
         actionManager.setCurrentAction("MO",  bm_sim.time);
         initial_time = bm_sim.time;
 
-    elseif (actionManager.current_action == 2 && goal_reached) || (delta_time > 10)
+    elseif (actionManager.current_action == 2 && goal_reached2) || (delta_time > 10)
         actionManager.setCurrentAction("ST",  bm_sim.time);
+        initial_time = bm_sim.time;
     end
 end
 % Display joint position and velocity, Display for a given action, a number of tasks

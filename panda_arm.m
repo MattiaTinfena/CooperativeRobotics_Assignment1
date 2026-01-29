@@ -29,6 +29,12 @@ classdef panda_arm < handle
         alt
         dist_to_goal
         rot_to_goal
+
+        dist_to_goal2
+        rot_to_goal2
+
+        object_des_vel
+
     end
 
     methods
@@ -36,10 +42,13 @@ classdef panda_arm < handle
             % Constructor
             obj.robot_model = model;
             obj.wTb = wTb;
-
+            obj.dist_to_goal2 = Inf;
+            obj.rot_to_goal2 = Inf;
             %Initialize Default State
             obj.q=[0.0167305,-0.762614,-0.0207622,-2.34352,-0.0305686,1.53975,0.753872]';
             obj.qdot=[0 0 0 0 0 0 0]';
+
+            obj.object_des_vel = zeros(6, 1);
 
             %Get current transformation from world frame to end effector
             %Frame

@@ -17,6 +17,20 @@ classdef SimulationLogger < handle
         tools_distance
         tools_orientation
 
+        % --- NUOVE PROPRIETA' PER LE VELOCITA' ---
+        % Left Arm
+        v_lin_tool_l
+        v_ang_tool_l
+        v_lin_obj_l
+        v_ang_obj_l
+
+        % Right Arm
+        v_lin_tool_r
+        v_ang_tool_r
+        v_lin_obj_r
+        v_ang_obj_r
+        % -----------------------------------------
+
         xdotbar_task
         activation_task
         priority_task
@@ -57,6 +71,18 @@ classdef SimulationLogger < handle
 
             obj.tools_distance = zeros(1, maxLoops);
             obj.tools_orientation = zeros(1, maxLoops);
+
+            % --- INIZIALIZZAZIONE NUOVE MATRICI ---
+            obj.v_lin_tool_l = zeros(3, maxLoops);
+            obj.v_ang_tool_l = zeros(3, maxLoops);
+            obj.v_lin_obj_l  = zeros(3, maxLoops);
+            obj.v_ang_obj_l  = zeros(3, maxLoops);
+
+            obj.v_lin_tool_r = zeros(3, maxLoops);
+            obj.v_ang_tool_r = zeros(3, maxLoops);
+            obj.v_lin_obj_r  = zeros(3, maxLoops);
+            obj.v_ang_obj_r  = zeros(3, maxLoops);
+            % --------------------------------------
 
             obj.n = length(actionManager.actions);
             l = zeros(1, obj.n);
@@ -111,14 +137,60 @@ classdef SimulationLogger < handle
             r_r = obj.robot.right_arm.rot_to_goal;
             if ~isempty(r_r), n_rows = min(3, length(r_r)); obj.rot_r(1:n_rows, loop) = r_r(1:n_rows); end
 
-            [diff_ang, lin_ang] = CartError(obj.robot.left_arm.wTt ,obj.robot.right_arm.wTt);
-
-            % --- CALCOLO DISTANZA LINEARE ---
-
+            [~, lin_ang] = CartError(obj.robot.left_arm.wTt ,obj.robot.right_arm.wTt);
             obj.tools_distance(loop) = norm(lin_ang);
 
-            % --- CALCOLO DIFFERENZA ORIENTAMENTO ---
-            obj.tools_orientation(loop) = obj.robot.left_arm.error;
+            R_L = obj.robot.left_arm.wTt(1:3, 1:3);
+            % R_L = diag([-1 -1 1])*R_L;
+            R_R = obj.robot.right_arm.wTt(1:3, 1:3);
+
+            R_diff = R_L' * R_R;
+
+            obj.tools_orientation(loop) = norm(VersorLemma(R_diff, eye(3)));
+
+            % =========================================================
+            % --- USER TO FILL: VELOCITIES (Tool & Object) ---
+            % =========================================================
+            twist_l = obj.robot.left_arm.wJt * obj.robot.left_arm.qdot;
+            twist_r = obj.robot.right_arm.wJt* obj.robot.right_arm.qdot;
+
+            % --- LEFT ARM ---
+            % Velocità Lineare Tool (3x1)
+            temp_v_lin_tool_l = twist_l(4:6);
+
+            % Velocità Angolare Tool (3x1)
+            temp_v_ang_tool_l = twist_l(1:3);
+
+            % Velocità Lineare Oggetto (3x1)
+            temp_v_lin_obj_l  = obj.robot.left_arm.object_des_vel(4:6);
+
+            % Velocità Angolare Oggetto (3x1)
+            temp_v_ang_obj_l  = obj.robot.left_arm.object_des_vel(1:3);
+
+            % --- RIGHT ARM ---
+            % Velocità Lineare Tool (3x1)
+            temp_v_lin_tool_r = twist_r(4:6);
+
+            % Velocità Angolare Tool (3x1)
+            temp_v_ang_tool_r = twist_r(1:3);
+
+            % Velocità Lineare Oggetto (3x1)
+            temp_v_lin_obj_r  = obj.robot.right_arm.object_des_vel(4:6);
+
+            % Velocità Angolare Oggetto (3x1)
+            temp_v_ang_obj_r  = obj.robot.right_arm.object_des_vel(1:3);
+
+            % --- Salvataggio nella history ---
+            obj.v_lin_tool_l(:, loop) = temp_v_lin_tool_l;
+            obj.v_ang_tool_l(:, loop) = temp_v_ang_tool_l;
+            obj.v_lin_obj_l(:, loop)  = temp_v_lin_obj_l;
+            obj.v_ang_obj_l(:, loop)  = temp_v_ang_obj_l;
+
+            obj.v_lin_tool_r(:, loop) = temp_v_lin_tool_r;
+            obj.v_ang_tool_r(:, loop) = temp_v_ang_tool_r;
+            obj.v_lin_obj_r(:, loop)  = temp_v_lin_obj_r;
+            obj.v_ang_obj_r(:, loop)  = temp_v_ang_obj_r;
+            % =========================================================
 
             for i = 1:obj.n
                 tasks = obj.action_mng.actions{i};
@@ -168,8 +240,6 @@ classdef SimulationLogger < handle
             t_plot = obj.t(1:obj.curr_loop);
 
             % --- DEFINIZIONE LIMITE ASSE X ---
-            % Usa t_plot(end) per tagliare esattamente alla fine della simulazione
-            % Oppure scrivi un numero fisso, es: T_MAX = 10;
             T_MAX = 20;
             % ---------------------------------
 
@@ -178,28 +248,126 @@ classdef SimulationLogger < handle
             plot(t_plot, obj.ql(:, 1:obj.curr_loop), 'LineWidth', LW);
             title('Left Arm Joints (ql)', 'FontSize', FS_Title);
             grid on; set(gca, 'FontSize', FS);
-            xlim([0, T_MAX]); % Fissa asse X
+            xlim([0, T_MAX]);
 
             subplot(2,1,2);
             plot(t_plot, obj.qr(:, 1:obj.curr_loop), 'LineWidth', LW);
             title('Right Arm Joints (qr)', 'FontSize', FS_Title);
             grid on; set(gca, 'FontSize', FS);
             sgtitle('Robot Joint Positions', 'FontSize', FS_Title+2, 'FontWeight', 'bold');
-            xlim([0, T_MAX]); % Fissa asse X
+            xlim([0, T_MAX]);
 
             figure(2);
             subplot(2,1,1);
             plot(t_plot, obj.qdotl(:, 1:obj.curr_loop), 'LineWidth', LW);
             title('Left Arm Velocities (qdotl)', 'FontSize', FS_Title);
             grid on; set(gca, 'FontSize', FS);
-            xlim([0, T_MAX]); % Fissa asse X
+            xlim([0, T_MAX]);
 
             subplot(2,1,2);
             plot(t_plot, obj.qdotr(:, 1:obj.curr_loop), 'LineWidth', LW);
             title('Right Arm Velocities (qdotr)', 'FontSize', FS_Title);
             grid on; set(gca, 'FontSize', FS);
             sgtitle('Robot Joint Velocities', 'FontSize', FS_Title+2, 'FontWeight', 'bold');
-            xlim([0, T_MAX]); % Fissa asse X
+            xlim([0, T_MAX]);
+
+            % --- NUOVA FIGURA 3: LEFT ARM TOOL VS OBJECT VELOCITIES ---
+            figure(3); clf;
+            sgtitle('Left Arm: Actual tool velocities vs Object desired velocities', 'FontSize', FS_Title+2, 'FontWeight', 'bold');
+
+            % Subplot 1: Linear Velocities
+            subplot(2,1,1); hold on;
+            % Tool (Solid Lines)
+            plot(t_plot, obj.v_lin_tool_l(1, 1:obj.curr_loop), 'r-', 'LineWidth', LW);
+            plot(t_plot, obj.v_lin_tool_l(2, 1:obj.curr_loop), 'g-', 'LineWidth', LW);
+            plot(t_plot, obj.v_lin_tool_l(3, 1:obj.curr_loop), 'b-', 'LineWidth', LW);
+            % Object (Dashed Lines)
+            plot(t_plot, obj.v_lin_obj_l(1, 1:obj.curr_loop), 'r--', 'LineWidth', LW);
+            plot(t_plot, obj.v_lin_obj_l(2, 1:obj.curr_loop), 'g--', 'LineWidth', LW);
+            plot(t_plot, obj.v_lin_obj_l(3, 1:obj.curr_loop), 'b--', 'LineWidth', LW);
+
+            % --- Switch Lines ---
+            for s = 1:length(obj.switch_times)
+                xline(obj.switch_times(s), '--k', 'LineWidth', LW_GRID, 'Alpha', 0.6, 'HandleVisibility', 'off');
+            end
+
+            hold off; grid on; set(gca, 'FontSize', FS);
+            ylabel('Linear Vel [m/s]', 'FontSize', FS);
+            title('Linear velocities', 'FontSize', FS_Title);
+            legend('Tx','Ty','Tz','Ox','Oy','Oz', 'Location', 'eastoutside');
+            xlim([0, T_MAX]);
+
+            % Subplot 2: Angular Velocities
+            subplot(2,1,2); hold on;
+            % Tool (Solid Lines)
+            plot(t_plot, obj.v_ang_tool_l(1, 1:obj.curr_loop), 'r-', 'LineWidth', LW);
+            plot(t_plot, obj.v_ang_tool_l(2, 1:obj.curr_loop), 'g-', 'LineWidth', LW);
+            plot(t_plot, obj.v_ang_tool_l(3, 1:obj.curr_loop), 'b-', 'LineWidth', LW);
+            % Object (Dashed Lines)
+            plot(t_plot, obj.v_ang_obj_l(1, 1:obj.curr_loop), 'r--', 'LineWidth', LW);
+            plot(t_plot, obj.v_ang_obj_l(2, 1:obj.curr_loop), 'g--', 'LineWidth', LW);
+            plot(t_plot, obj.v_ang_obj_l(3, 1:obj.curr_loop), 'b--', 'LineWidth', LW);
+
+            % --- Switch Lines ---
+            for s = 1:length(obj.switch_times)
+                xline(obj.switch_times(s), '--k', 'LineWidth', LW_GRID, 'Alpha', 0.6, 'HandleVisibility', 'off');
+            end
+
+            hold off; grid on; set(gca, 'FontSize', FS);
+            ylabel('Angular Vel [rad/s]', 'FontSize', FS);
+            xlabel('Time [s]', 'FontSize', FS);
+            title('Angular velocities', 'FontSize', FS_Title);
+            legend('Tx','Ty','Tz','Ox','Oy','Oz', 'Location', 'eastoutside');
+            xlim([0, T_MAX]);
+
+            % --- NUOVA FIGURA 4: RIGHT ARM TOOL VS OBJECT VELOCITIES ---
+            figure(4); clf;
+            sgtitle('Right Arm: Actual tool velocities vs Object desired velocities', 'FontSize', FS_Title+2, 'FontWeight', 'bold');
+
+            % Subplot 1: Linear Velocities
+            subplot(2,1,1); hold on;
+            % Tool (Solid Lines)
+            plot(t_plot, obj.v_lin_tool_r(1, 1:obj.curr_loop), 'r-', 'LineWidth', LW);
+            plot(t_plot, obj.v_lin_tool_r(2, 1:obj.curr_loop), 'g-', 'LineWidth', LW);
+            plot(t_plot, obj.v_lin_tool_r(3, 1:obj.curr_loop), 'b-', 'LineWidth', LW);
+            % Object (Dashed Lines)
+            plot(t_plot, obj.v_lin_obj_r(1, 1:obj.curr_loop), 'r--', 'LineWidth', LW);
+            plot(t_plot, obj.v_lin_obj_r(2, 1:obj.curr_loop), 'g--', 'LineWidth', LW);
+            plot(t_plot, obj.v_lin_obj_r(3, 1:obj.curr_loop), 'b--', 'LineWidth', LW);
+
+            % --- Switch Lines ---
+            for s = 1:length(obj.switch_times)
+                xline(obj.switch_times(s), '--k', 'LineWidth', LW_GRID, 'Alpha', 0.6, 'HandleVisibility', 'off');
+            end
+
+            hold off; grid on; set(gca, 'FontSize', FS);
+            ylabel('Linear Vel [m/s]', 'FontSize', FS);
+            title('Linear velocities', 'FontSize', FS_Title);
+            legend('Tx','Ty','Tz','Ox','Oy','Oz', 'Location', 'eastoutside');
+            xlim([0, T_MAX]);
+
+            % Subplot 2: Angular Velocities
+            subplot(2,1,2); hold on;
+            % Tool (Solid Lines)
+            plot(t_plot, obj.v_ang_tool_r(1, 1:obj.curr_loop), 'r-', 'LineWidth', LW);
+            plot(t_plot, obj.v_ang_tool_r(2, 1:obj.curr_loop), 'g-', 'LineWidth', LW);
+            plot(t_plot, obj.v_ang_tool_r(3, 1:obj.curr_loop), 'b-', 'LineWidth', LW);
+            % Object (Dashed Lines)
+            plot(t_plot, obj.v_ang_obj_r(1, 1:obj.curr_loop), 'r--', 'LineWidth', LW);
+            plot(t_plot, obj.v_ang_obj_r(2, 1:obj.curr_loop), 'g--', 'LineWidth', LW);
+            plot(t_plot, obj.v_ang_obj_r(3, 1:obj.curr_loop), 'b--', 'LineWidth', LW);
+
+            % --- Switch Lines ---
+            for s = 1:length(obj.switch_times)
+                xline(obj.switch_times(s), '--k', 'LineWidth', LW_GRID, 'Alpha', 0.6, 'HandleVisibility', 'off');
+            end
+
+            hold off; grid on; set(gca, 'FontSize', FS);
+            ylabel('Angular Vel [rad/s]', 'FontSize', FS);
+            xlabel('Time [s]', 'FontSize', FS);
+            title('Angular velocities', 'FontSize', FS_Title);
+            legend('Tx','Ty','Tz','Ox','Oy','Oz', 'Location', 'eastoutside');
+            xlim([0, T_MAX]);
 
             figure(20); clf; hold on;
             for k = 1:obj.total_tasks
@@ -209,7 +377,7 @@ classdef SimulationLogger < handle
             y_limits = ylim;
             if y_limits(2) < 1.1, y_limits(2) = 1.1; end
             ylim([-0.1, y_limits(2)]);
-            xlim([0, T_MAX]); % Fissa asse X
+            xlim([0, T_MAX]);
 
             for s = 1:length(obj.switch_times)
                 xline(obj.switch_times(s), '--k', 'LineWidth', LW_GRID, 'Alpha', 0.6);
@@ -300,7 +468,7 @@ classdef SimulationLogger < handle
                     for s = 1:length(obj.switch_times)
                         xline(ax1, obj.switch_times(s), ':k', 'Alpha', 0.5, 'LineWidth', LW_GRID, 'HandleVisibility', 'off');
                     end
-                    xlim(ax1, [0, T_MAX]); % Fissa asse X
+                    xlim(ax1, [0, T_MAX]);
 
                     n_vel = size(data_xdot, 1);
                     vel_labels = arrayfun(@(x) sprintf('$\\dot{x}_{%d}$', x), 1:n_vel, 'UniformOutput', false);
@@ -309,7 +477,6 @@ classdef SimulationLogger < handle
                     ax2 = subplot(3,1,2, 'Parent', tab);
                     hold(ax2, 'on');
 
-                    % Stili richiesti: ap blu continua, A nero tratteggiato
                     h_ap = plot(ax2, t_plot, data_ap', '-b', 'LineWidth', LW);
                     h_A = plot(ax2, t_plot, data_A', '--k', 'LineWidth', LW);
                     h_prod = plot(ax2, t_plot, data_prod', '-.r', 'LineWidth', LW);
@@ -324,7 +491,7 @@ classdef SimulationLogger < handle
                             {'$a_p$', '$A$', '$Total$'}, ...
                             'Interpreter', 'latex', 'Location', 'eastoutside', 'FontSize', FS);
                     end
-                    xlim(ax2, [0, T_MAX]); % Fissa asse X
+                    xlim(ax2, [0, T_MAX]);
 
                     ax3 = subplot(3,1,3, 'Parent', tab);
                     hold(ax3, 'on');
@@ -393,11 +560,10 @@ classdef SimulationLogger < handle
                     ylabel(ax3, y_lab, 'FontSize', FS);
                     xlabel(ax3, 'Time [s]', 'FontSize', FS);
                     title(ax3, t_tit, 'FontSize', FS_Title);
-                    xlim(ax3, [0, T_MAX]); % Fissa asse X
+                    xlim(ax3, [0, T_MAX]);
 
-                    % --- Limite specifico Y per Orientation ---
                     if strcmp(t_tit, 'Tools Orientation')
-                        ylim(ax3, [0, 1.35]);
+                        ylim(ax3, [0, 6.28]);
                     end
                 end
             end

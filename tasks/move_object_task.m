@@ -24,13 +24,15 @@ classdef move_object_task < Task
             wTog = [robot.wTt(1:3, 1:3) * robot.wTog(1:3, 1:3), robot.wTog(1:3, 4); 0 0 0 1];
 
             [v_ang, v_lin] = CartError(wTog ,wToc);
-            robot.dist_to_goal=v_lin;
-            robot.rot_to_goal=v_ang;
+            robot.dist_to_goal2=v_lin;
+            robot.rot_to_goal2=v_ang;
 
             obj.xdotbar =  0.7 * [v_ang; v_lin];
             % limit the requested velocities...
             obj.xdotbar(1:3) = Saturate(obj.xdotbar(1:3), 0.3);
             obj.xdotbar(4:6) = Saturate(obj.xdotbar(4:6), 0.3);
+
+            robot.object_des_vel = obj.xdotbar;
         end
 
         function updateJacobian(obj,robot_system)
@@ -43,6 +45,7 @@ classdef move_object_task < Task
 
             r_toc = robot.wTo(1:3, 4) - robot.wTg(1:3,4);
             wS_toc = [eye(3) zeros(3); skew(-robot.wTt(1:3, 1:3)' * r_toc) eye(3)];
+
 
             if obj.ID=='L'
                 obj.J=[wS_toc * tool_jacobian, zeros(6, 7)];
