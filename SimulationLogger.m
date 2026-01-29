@@ -14,6 +14,9 @@ classdef SimulationLogger < handle
         rot_l
         rot_r
 
+        tools_distance
+        tools_orientation
+
         xdotbar_task
         activation_task
         priority_task
@@ -51,6 +54,9 @@ classdef SimulationLogger < handle
             obj.dist_r = zeros(1, maxLoops);
             obj.rot_l = zeros(3, maxLoops);
             obj.rot_r = zeros(3, maxLoops);
+
+            obj.tools_distance = zeros(1, maxLoops);
+            obj.tools_orientation = zeros(1, maxLoops);
 
             obj.n = length(actionManager.actions);
             l = zeros(1, obj.n);
@@ -105,6 +111,15 @@ classdef SimulationLogger < handle
             r_r = obj.robot.right_arm.rot_to_goal;
             if ~isempty(r_r), n_rows = min(3, length(r_r)); obj.rot_r(1:n_rows, loop) = r_r(1:n_rows); end
 
+            [diff_ang, lin_ang] = CartError(obj.robot.left_arm.wTt ,obj.robot.right_arm.wTt);
+
+            % --- CALCOLO DISTANZA LINEARE ---
+
+            obj.tools_distance(loop) = norm(lin_ang);
+
+            % --- CALCOLO DIFFERENZA ORIENTAMENTO ---
+            obj.tools_orientation(loop) = obj.robot.left_arm.error;
+
             for i = 1:obj.n
                 tasks = obj.action_mng.actions{i};
                 for j = 1:length(tasks)
@@ -152,29 +167,39 @@ classdef SimulationLogger < handle
 
             t_plot = obj.t(1:obj.curr_loop);
 
+            % --- DEFINIZIONE LIMITE ASSE X ---
+            % Usa t_plot(end) per tagliare esattamente alla fine della simulazione
+            % Oppure scrivi un numero fisso, es: T_MAX = 10;
+            T_MAX = 20;
+            % ---------------------------------
+
             figure(1);
             subplot(2,1,1);
             plot(t_plot, obj.ql(:, 1:obj.curr_loop), 'LineWidth', LW);
             title('Left Arm Joints (ql)', 'FontSize', FS_Title);
             grid on; set(gca, 'FontSize', FS);
+            xlim([0, T_MAX]); % Fissa asse X
 
             subplot(2,1,2);
             plot(t_plot, obj.qr(:, 1:obj.curr_loop), 'LineWidth', LW);
             title('Right Arm Joints (qr)', 'FontSize', FS_Title);
             grid on; set(gca, 'FontSize', FS);
             sgtitle('Robot Joint Positions', 'FontSize', FS_Title+2, 'FontWeight', 'bold');
+            xlim([0, T_MAX]); % Fissa asse X
 
             figure(2);
             subplot(2,1,1);
             plot(t_plot, obj.qdotl(:, 1:obj.curr_loop), 'LineWidth', LW);
             title('Left Arm Velocities (qdotl)', 'FontSize', FS_Title);
             grid on; set(gca, 'FontSize', FS);
+            xlim([0, T_MAX]); % Fissa asse X
 
             subplot(2,1,2);
             plot(t_plot, obj.qdotr(:, 1:obj.curr_loop), 'LineWidth', LW);
             title('Right Arm Velocities (qdotr)', 'FontSize', FS_Title);
             grid on; set(gca, 'FontSize', FS);
             sgtitle('Robot Joint Velocities', 'FontSize', FS_Title+2, 'FontWeight', 'bold');
+            xlim([0, T_MAX]); % Fissa asse X
 
             figure(20); clf; hold on;
             for k = 1:obj.total_tasks
@@ -184,6 +209,7 @@ classdef SimulationLogger < handle
             y_limits = ylim;
             if y_limits(2) < 1.1, y_limits(2) = 1.1; end
             ylim([-0.1, y_limits(2)]);
+            xlim([0, T_MAX]); % Fissa asse X
 
             for s = 1:length(obj.switch_times)
                 xline(obj.switch_times(s), '--k', 'LineWidth', LW_GRID, 'Alpha', 0.6);
@@ -236,6 +262,8 @@ classdef SimulationLogger < handle
                 metrics_config = {
                     {q_L_data, q_R_data, 'Rad', 'Joint Config (q)'}, ...
                     {obj.alt_l(1:obj.curr_loop), obj.alt_r(1:obj.curr_loop), 'm', 'Altitude (alt)'}, ...
+                    {obj.tools_distance(1:obj.curr_loop), [], 'm', 'Tools Distance'}, ...
+                    {obj.tools_orientation(1:obj.curr_loop), [], 'rad', 'Tools Orientation'}, ...
                     {obj.dist_l(1:obj.curr_loop), obj.dist_r(1:obj.curr_loop), 'm', 'Dist to Goal'}, ...
                     {obj.rot_l(:,1:obj.curr_loop), obj.rot_r(:,1:obj.curr_loop), 'rad/err', 'Rot to Goal'} ...
                     };
@@ -272,6 +300,7 @@ classdef SimulationLogger < handle
                     for s = 1:length(obj.switch_times)
                         xline(ax1, obj.switch_times(s), ':k', 'Alpha', 0.5, 'LineWidth', LW_GRID, 'HandleVisibility', 'off');
                     end
+                    xlim(ax1, [0, T_MAX]); % Fissa asse X
 
                     n_vel = size(data_xdot, 1);
                     vel_labels = arrayfun(@(x) sprintf('$\\dot{x}_{%d}$', x), 1:n_vel, 'UniformOutput', false);
@@ -279,8 +308,10 @@ classdef SimulationLogger < handle
 
                     ax2 = subplot(3,1,2, 'Parent', tab);
                     hold(ax2, 'on');
-                    h_ap = plot(ax2, t_plot, data_ap', '--k', 'LineWidth', LW);
-                    h_A = plot(ax2, t_plot, data_A', '-b', 'LineWidth', LW/2 + 1);
+
+                    % Stili richiesti: ap blu continua, A nero tratteggiato
+                    h_ap = plot(ax2, t_plot, data_ap', '-b', 'LineWidth', LW);
+                    h_A = plot(ax2, t_plot, data_A', '--k', 'LineWidth', LW);
                     h_prod = plot(ax2, t_plot, data_prod', '-.r', 'LineWidth', LW);
 
                     for s = 1:length(obj.switch_times)
@@ -293,6 +324,7 @@ classdef SimulationLogger < handle
                             {'$a_p$', '$A$', '$Total$'}, ...
                             'Interpreter', 'latex', 'Location', 'eastoutside', 'FontSize', FS);
                     end
+                    xlim(ax2, [0, T_MAX]); % Fissa asse X
 
                     ax3 = subplot(3,1,3, 'Parent', tab);
                     hold(ax3, 'on');
@@ -340,7 +372,11 @@ classdef SimulationLogger < handle
                             else, plot(ax3, t_plot, data_R, 'r--', 'LineWidth', LW); end
                         end
 
-                        if has_L && has_R
+                        if contains(t_tit, 'Tools Distance')
+                            legend(ax3, 'Distance [m]', 'Location', 'eastoutside', 'FontSize', FS);
+                        elseif contains(t_tit, 'Tools Orientation')
+                            legend(ax3, 'Orientation [rad]', 'Location', 'eastoutside', 'FontSize', FS);
+                        elseif has_L && has_R
                             legend(ax3, 'Left', 'Right', 'Location', 'eastoutside', 'FontSize', FS);
                         elseif has_L
                             legend(ax3, 'Left', 'Location', 'eastoutside', 'FontSize', FS);
@@ -357,6 +393,12 @@ classdef SimulationLogger < handle
                     ylabel(ax3, y_lab, 'FontSize', FS);
                     xlabel(ax3, 'Time [s]', 'FontSize', FS);
                     title(ax3, t_tit, 'FontSize', FS_Title);
+                    xlim(ax3, [0, T_MAX]); % Fissa asse X
+
+                    % --- Limite specifico Y per Orientation ---
+                    if strcmp(t_tit, 'Tools Orientation')
+                        ylim(ax3, [0, 1.35]);
+                    end
                 end
             end
         end
